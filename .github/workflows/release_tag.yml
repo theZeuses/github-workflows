@@ -1,0 +1,96 @@
+name: Release tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name (e.g., v1.0.0)'
+        required: true
+        default: ''
+      release_name:
+        description: 'Release name (optional)'
+        required: false
+        default: ''
+
+jobs:
+  fetch_tags:
+    name: Fetch Tags
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+
+      - name: Fetch tags
+        uses: ./actions/fetch-tags
+        id: fetch_tags
+
+      - name: Display tags
+        run: |
+            echo "Fetched tags: ${{ steps.fetch_tags.outputs.tags }}"
+
+  validate_tag:
+    name: Validate tag version
+    runs-on: ubuntu-22.04
+    needs: fetch_tags
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Validate Tag Format
+        run: |
+          if [[ ! "${{ github.event.inputs.tag }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Tag '${{ github.event.inputs.tag }}' does not match the required format 'vX.X.X'."
+            exit 1
+          fi
+
+      - name: Check if Tag Exists
+        run: |
+          if ! git ls-remote --tags origin | grep -q "refs/tags/${{ github.event.inputs.tag }}"; then
+            echo "Error: Tag '${{ github.event.inputs.tag }}' does not exist."
+            exit 1
+          fi
+
+  release_version:
+    name: Publish Release Version
+    runs-on: ubuntu-22.04
+    needs: validate_tag
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0  # Ensure all history is fetched
+
+      - name: Get Previous Tag
+        id: previous_tag
+        run: |
+          previous_tag=$(git describe --tags $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+          if [ -z "$previous_tag" ]; then
+            previous_tag=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "none")
+          fi
+          echo "Previous tag: $previous_tag"
+          echo "previous_tag=$previous_tag" >> $GITHUB_ENV
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          if [ "${{ env.previous_tag }}" == "none" ]; then
+            commit_messages="No previous tag found. This is the first release."
+          else
+            commit_messages=$(git log --pretty=format:"%h - %s" ${{ env.previous_tag }}..HEAD)
+          fi
+          echo "Commit messages: $commit_messages"
+          echo -e "## Changes in this release\n$commit_messages" > release_notes.md
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          release_name: ${{ github.event.inputs.release_name || github.event.inputs.tag }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
