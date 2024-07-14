@@ -13,25 +13,9 @@ on:
         default: ''
 
 jobs:
-  fetch_tags:
-    name: Fetch Tags
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.1.1
-
-      - name: Fetch tags
-        uses: ./actions/fetch-tags
-        id: fetch_tags
-
-      - name: Display tags
-        run: |
-            echo "Fetched tags: ${{ steps.fetch_tags.outputs.tags }}"
-
   validate_tag:
     name: Validate tag version
     runs-on: ubuntu-22.04
-    needs: fetch_tags
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.1
