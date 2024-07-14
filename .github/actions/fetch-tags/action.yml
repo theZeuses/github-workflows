@@ -2,7 +2,7 @@ name: 'Fetch Tags'
 description: 'Fetch all tags from the repository'
 inputs: {}
 outputs:
-  tags: 'List of tags'
+  tags: 'tags'
 runs:
   using: 'node12'
   main: 'index.js'
