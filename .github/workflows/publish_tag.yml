@@ -1,4 +1,4 @@
-name: Production - Publish Tag
+name: Publish Tag
 
 on:
   workflow_dispatch:
